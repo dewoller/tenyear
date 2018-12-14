@@ -1,0 +1,86 @@
+---
+title: "Benzo-opioid 01 year analysis"
+author:  "Mofi Islam and Dennis Wollersheim "
+date: "2018-12-10"
+output:
+  workflowr::wflow_html:
+    toc: false
+---
+
+```{r pre_initial, echo=FALSE, results='hide', message=FALSE, warning=FALSE}
+
+rm(list=ls())
+options(width = 200)
+show_code = FALSE
+source("lib/functions.R")
+source("lib/mapping_functions.R")
+source("lib/standardisation.R")
+source("lib/get_data.R")
+source("lib/generate_data_frames.R")
+library('tidyverse')
+opts_chunk$set(echo = FALSE)
+
+```
+
+
+```{r initial, results='hide', message=FALSE, warning=FALSE}
+
+limit = 10000
+
+get_data_from_cache(limit )
+
+df_disease %>%
+  inner_join( distinct( df_10year, pin ), 'pin') %>%
+  select (-n_pill ) %>%
+  spread( chronic_disease_category, n_script, fill=0 ) %>% 
+  { . } -> df_disease_wide
+
+
+df_10year %>%
+  group_by( pin, drug_type, supply_year ) %>%
+  summarise( n_dose = sum( n_dose ) ) %>%
+  inner_join( df_patient_usage, by='pin' )  %>%
+  inner_join( df_patient, by='pin' )  %>%
+  inner_join( df_disease_wide, by='pin' )  %>% 
+  { . } -> df_wide
+
+  foreign::write.dta( '/tmp/10year_scripts.dta')
+
+
+
+library( ExPanDaR )
+
+
+ExPanD(df_wide, cs_id = "drug_type", ts_id = "supply_year")
+
+```
+# Methods
+
+
+#Dataset summary
+There are more opioid prescriptions and users than Benzodiazepine users
+
+```{r data_summary, echo=FALSE, warning=FALSE, results='asis'}
+
+cat("  \n###",  "Total Number of Scripts with either Benzo or Opioid\n")
+df %>% inner_join( df_patient ) %>% group_by(state) %>% count() %>% kable()
+#
+cat("  \n###",  "Total Number of People with either Benzo or Opioid\n")
+df_patient %>% group_by(state) %>% count() %>% kable()
+#
+cat("  \n###",  "Total Number of People with Opioid  or benzo\n")
+print('people')
+df %>% inner_join( df_patient ) %>% group_by( drug_type, state) %>% count() %>% kable()
+#
+```
+
+#Methods  - find overlaps 
+
+
+# break prescriptions into 4 distinct usage types;  
+ -  opioid_dd - opioid with a benzodiazepine overlapping
+ -  benzo_dd - benzodiazepine with an opioid overlapping
+ -  opioid_alone - opioid with no overlap
+ -  benzo_alone - benzodiazepine with no overlap
+
+
